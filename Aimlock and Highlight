@@ -1,0 +1,246 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local Camera = workspace.CurrentCamera
+
+local SKY_BLUE = Color3.fromRGB(80, 200, 255)
+
+local AimlockEnabled = false
+
+--==================================================
+-- GUI
+--==================================================
+
+local Gui = Instance.new("ScreenGui")
+Gui.Name = "ShadeUI"
+Gui.ResetOnSpawn = false
+Gui.IgnoreGuiInset = true
+Gui.Parent = PlayerGui
+
+-- Aimlock button
+local Button = Instance.new("TextButton")
+Button.Name = "AimlockButton"
+Button.Size = UDim2.fromOffset(145, 48)
+Button.Position = UDim2.new(0.5, -72, 0, 20)
+Button.BackgroundColor3 = SKY_BLUE
+Button.Text = "AIMLOCK: OFF"
+Button.TextColor3 = Color3.new(1, 1, 1)
+Button.TextSize = 17
+Button.Font = Enum.Font.GothamBold
+Button.BorderSizePixel = 0
+Button.ZIndex = 10
+Button.Parent = Gui
+
+local Corner = Instance.new("UICorner")
+Corner.CornerRadius = UDim.new(0, 10)
+Corner.Parent = Button
+
+-- Made by Shade
+local Credit = Instance.new("TextLabel")
+Credit.Name = "Credit"
+Credit.Size = UDim2.fromOffset(180, 25)
+Credit.Position = UDim2.new(0.5, -90, 1, -35)
+Credit.BackgroundTransparency = 1
+Credit.Text = "Made by Shade"
+Credit.TextColor3 = Color3.new(1, 1, 1)
+Credit.TextTransparency = 0.15
+Credit.TextSize = 15
+Credit.Font = Enum.Font.GothamMedium
+Credit.ZIndex = 10
+Credit.Parent = Gui
+
+--==================================================
+-- DRAG SYSTEM
+--==================================================
+
+local dragging = false
+local dragInput = nil
+local dragStart = nil
+local startPosition = nil
+local didDrag = false
+
+local DRAG_THRESHOLD = 8
+
+Button.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.Touch
+		or input.UserInputType == Enum.UserInputType.MouseButton1 then
+
+		dragging = true
+		dragInput = input
+		dragStart = input.Position
+		startPosition = Button.Position
+		didDrag = false
+	end
+end)
+
+Button.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.Touch
+		or input.UserInputType == Enum.UserInputType.MouseMovement then
+
+		dragInput = input
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if not dragging or input ~= dragInput then
+		return
+	end
+
+	local delta = input.Position - dragStart
+
+	if math.abs(delta.X) > DRAG_THRESHOLD
+		or math.abs(delta.Y) > DRAG_THRESHOLD then
+
+		didDrag = true
+	end
+
+	if didDrag then
+		Button.Position = UDim2.new(
+			startPosition.X.Scale,
+			startPosition.X.Offset + delta.X,
+			startPosition.Y.Scale,
+			startPosition.Y.Offset + delta.Y
+		)
+	end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.Touch
+		or input.UserInputType == Enum.UserInputType.MouseButton1 then
+
+		if dragging and not didDrag then
+			AimlockEnabled = not AimlockEnabled
+
+			Button.Text = AimlockEnabled
+				and "AIMLOCK: ON"
+				or "AIMLOCK: OFF"
+		end
+
+		dragging = false
+		dragInput = nil
+	end
+end)
+
+--==================================================
+-- CLOSEST PLAYER
+--==================================================
+
+local function getClosestPlayer()
+	local closest = nil
+	local closestDistance = math.huge
+
+	for _, player in Players:GetPlayers() do
+		if player ~= LocalPlayer then
+
+			local character = player.Character
+			local humanoid = character
+				and character:FindFirstChildOfClass("Humanoid")
+			local root = character
+				and character:FindFirstChild("HumanoidRootPart")
+
+			if humanoid and root and humanoid.Health > 0 then
+
+				local screenPos, visible =
+					Camera:WorldToViewportPoint(root.Position)
+
+				if visible then
+
+					local center = Vector2.new(
+						Camera.ViewportSize.X / 2,
+						Camera.ViewportSize.Y / 2
+					)
+
+					local distance = (
+						Vector2.new(screenPos.X, screenPos.Y)
+						- center
+					).Magnitude
+
+					if distance < closestDistance then
+						closestDistance = distance
+						closest = player
+					end
+				end
+			end
+		end
+	end
+
+	return closest
+end
+
+--==================================================
+-- AIMLOCK
+--==================================================
+
+RunService.RenderStepped:Connect(function()
+
+	if not AimlockEnabled then
+		return
+	end
+
+	local target = getClosestPlayer()
+
+	if target and target.Character then
+
+		local root =
+			target.Character:FindFirstChild("HumanoidRootPart")
+
+		if root then
+
+			Camera.CFrame = CFrame.lookAt(
+				Camera.CFrame.Position,
+				root.Position
+			)
+
+		end
+	end
+end)
+
+--==================================================
+-- AUTOMATIC SKY-BLUE ESP
+--==================================================
+
+local function setupESP(player)
+
+	if player == LocalPlayer then
+		return
+	end
+
+	local function addHighlight(character)
+
+		local old = character:FindFirstChild("ShadeESP")
+
+		if old then
+			old:Destroy()
+		end
+
+		local highlight = Instance.new("Highlight")
+
+		highlight.Name = "ShadeESP"
+		highlight.Adornee = character
+		highlight.FillColor = SKY_BLUE
+		highlight.OutlineColor = SKY_BLUE
+		highlight.FillTransparency = 0.65
+		highlight.OutlineTransparency = 0
+		highlight.DepthMode =
+			Enum.HighlightDepthMode.AlwaysOnTop
+
+		highlight.Parent = character
+	end
+
+	if player.Character then
+		addHighlight(player.Character)
+	end
+
+	player.CharacterAdded:Connect(addHighlight)
+end
+
+for _, player in Players:GetPlayers() do
+	setupESP(player)
+end
+
+Players.PlayerAdded:Connect(setupESP)
+
+print("Made by Shade")
