@@ -1,164 +1,255 @@
+--==================================================
+-- SHADE TARGET SYSTEM
+-- Studio Lite
+-- Made by Shade
+--==================================================
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
 local Camera = workspace.CurrentCamera
 
 local SKY_BLUE = Color3.fromRGB(80, 200, 255)
+local DARK = Color3.fromRGB(25, 25, 30)
 
+local PlayersEnabled = true
+local NPCsEnabled = false
 local AimlockEnabled = false
 
+local CurrentTarget = nil
+
 --==================================================
--- GUI
+-- SCREEN GUI
 --==================================================
 
 local Gui = Instance.new("ScreenGui")
-Gui.Name = "ShadeUI"
+Gui.Name = "ShadeTargetSystem"
 Gui.ResetOnSpawn = false
 Gui.IgnoreGuiInset = true
 Gui.Parent = PlayerGui
 
--- Aimlock button
-local Button = Instance.new("TextButton")
-Button.Name = "AimlockButton"
-Button.Size = UDim2.fromOffset(145, 48)
-Button.Position = UDim2.new(0.5, -72, 0, 20)
-Button.BackgroundColor3 = SKY_BLUE
-Button.Text = "AIMLOCK: OFF"
-Button.TextColor3 = Color3.new(1, 1, 1)
-Button.TextSize = 17
-Button.Font = Enum.Font.GothamBold
-Button.BorderSizePixel = 0
-Button.ZIndex = 10
-Button.Parent = Gui
-
-local Corner = Instance.new("UICorner")
-Corner.CornerRadius = UDim.new(0, 10)
-Corner.Parent = Button
-
--- Made by Shade
-local Credit = Instance.new("TextLabel")
-Credit.Name = "Credit"
-Credit.Size = UDim2.fromOffset(180, 25)
-Credit.Position = UDim2.new(0.5, -90, 1, -35)
-Credit.BackgroundTransparency = 1
-Credit.Text = "Made by Shade"
-Credit.TextColor3 = Color3.new(1, 1, 1)
-Credit.TextTransparency = 0.15
-Credit.TextSize = 15
-Credit.Font = Enum.Font.GothamMedium
-Credit.ZIndex = 10
-Credit.Parent = Gui
-
 --==================================================
--- DRAG SYSTEM
+-- DRAGGABLE WINDOWS
 --==================================================
 
-local dragging = false
-local dragInput = nil
-local dragStart = nil
-local startPosition = nil
-local didDrag = false
+local function makeDraggable(frame)
 
-local DRAG_THRESHOLD = 8
+	local dragging = false
+	local dragInput
+	local dragStart
+	local startPosition
 
-Button.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.Touch
-		or input.UserInputType == Enum.UserInputType.MouseButton1 then
+	frame.InputBegan:Connect(function(input)
 
-		dragging = true
-		dragInput = input
-		dragStart = input.Position
-		startPosition = Button.Position
-		didDrag = false
-	end
-end)
+		if input.UserInputType == Enum.UserInputType.Touch
+			or input.UserInputType == Enum.UserInputType.MouseButton1 then
 
-Button.InputChanged:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.Touch
-		or input.UserInputType == Enum.UserInputType.MouseMovement then
+			dragging = true
+			dragInput = input
+			dragStart = input.Position
+			startPosition = frame.Position
+		end
+	end)
 
-		dragInput = input
-	end
-end)
+	frame.InputChanged:Connect(function(input)
 
-UserInputService.InputChanged:Connect(function(input)
-	if not dragging or input ~= dragInput then
-		return
-	end
+		if input.UserInputType == Enum.UserInputType.Touch
+			or input.UserInputType == Enum.UserInputType.MouseMovement then
 
-	local delta = input.Position - dragStart
+			dragInput = input
+		end
+	end)
 
-	if math.abs(delta.X) > DRAG_THRESHOLD
-		or math.abs(delta.Y) > DRAG_THRESHOLD then
+	UserInputService.InputChanged:Connect(function(input)
 
-		didDrag = true
-	end
+		if not dragging or input ~= dragInput then
+			return
+		end
 
-	if didDrag then
-		Button.Position = UDim2.new(
+		local delta = input.Position - dragStart
+
+		frame.Position = UDim2.new(
 			startPosition.X.Scale,
 			startPosition.X.Offset + delta.X,
+
 			startPosition.Y.Scale,
 			startPosition.Y.Offset + delta.Y
 		)
-	end
-end)
+	end)
 
-UserInputService.InputEnded:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.Touch
-		or input.UserInputType == Enum.UserInputType.MouseButton1 then
+	UserInputService.InputEnded:Connect(function(input)
 
-		if dragging and not didDrag then
-			AimlockEnabled = not AimlockEnabled
+		if input.UserInputType == Enum.UserInputType.Touch
+			or input.UserInputType == Enum.UserInputType.MouseButton1 then
 
-			Button.Text = AimlockEnabled
-				and "AIMLOCK: ON"
-				or "AIMLOCK: OFF"
+			dragging = false
+			dragInput = nil
 		end
+	end)
+end
 
-		dragging = false
-		dragInput = nil
+--==================================================
+-- WINDOW CREATOR
+--==================================================
+
+local function createWindow(name, position, size)
+
+	local frame = Instance.new("Frame")
+
+	frame.Name = name
+	frame.Size = size
+	frame.Position = position
+
+	frame.BackgroundColor3 = DARK
+	frame.BackgroundTransparency = 0.08
+	frame.BorderSizePixel = 0
+
+	frame.Parent = Gui
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 12)
+	corner.Parent = frame
+
+	makeDraggable(frame)
+
+	return frame
+end
+
+--==================================================
+-- BUTTON CREATOR
+--==================================================
+
+local function createButton(parent, text, position)
+
+	local button = Instance.new("TextButton")
+
+	button.Size = UDim2.new(1, -20, 0, 42)
+	button.Position = position
+
+	button.BackgroundColor3 = SKY_BLUE
+	button.Text = text
+
+	button.TextColor3 = Color3.new(1, 1, 1)
+	button.TextSize = 16
+	button.Font = Enum.Font.GothamBold
+
+	button.BorderSizePixel = 0
+	button.AutoButtonColor = true
+
+	button.Parent = parent
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 9)
+	corner.Parent = button
+
+	return button
+end
+
+--==================================================
+-- TARGET GUI
+--==================================================
+
+local TargetGui = createWindow(
+	"TargetGui",
+	UDim2.new(0, 20, 0.35, 0),
+	UDim2.fromOffset(175, 125)
+)
+
+local PlayersButton = createButton(
+	TargetGui,
+	"PLAYERS: ON",
+	UDim2.fromOffset(10, 10)
+)
+
+local NPCButton = createButton(
+	TargetGui,
+	"NPCs: OFF",
+	UDim2.fromOffset(10, 62)
+)
+
+--==================================================
+-- AIMLOCK GUI
+--==================================================
+
+local AimGui = createWindow(
+	"AimlockGui",
+	UDim2.new(1, -195, 0.35, 0),
+	UDim2.fromOffset(175, 80)
+)
+
+local AimButton = createButton(
+	AimGui,
+	"AIMLOCK: OFF",
+	UDim2.fromOffset(10, 19)
+)
+
+--==================================================
+-- TARGET PART FINDER
+--==================================================
+
+local function getTargetPart(character)
+
+	if not character then
+		return nil
 	end
-end)
+
+	return character:FindFirstChild("HumanoidRootPart")
+		or character.PrimaryPart
+		or character:FindFirstChild("UpperTorso")
+		or character:FindFirstChild("Torso")
+		or character:FindFirstChild("Head")
+end
 
 --==================================================
--- CLOSEST PLAYER
+-- GET PLAYER TARGET
 --==================================================
 
-local function getClosestPlayer()
+local function getPlayerTarget()
+
 	local closest = nil
 	local closestDistance = math.huge
 
+	local center = Vector2.new(
+		Camera.ViewportSize.X / 2,
+		Camera.ViewportSize.Y / 2
+	)
+
 	for _, player in Players:GetPlayers() do
+
 		if player ~= LocalPlayer then
 
 			local character = player.Character
-			local humanoid = character
+
+			local humanoid =
+				character
 				and character:FindFirstChildOfClass("Humanoid")
-			local root = character
-				and character:FindFirstChild("HumanoidRootPart")
 
-			if humanoid and root and humanoid.Health > 0 then
+			local body = getTargetPart(character)
 
-				local screenPos, visible =
-					Camera:WorldToViewportPoint(root.Position)
+			if humanoid
+				and body
+				and humanoid.Health > 0 then
+
+				local screenPosition, visible =
+					Camera:WorldToViewportPoint(
+						body.Position
+					)
 
 				if visible then
 
-					local center = Vector2.new(
-						Camera.ViewportSize.X / 2,
-						Camera.ViewportSize.Y / 2
-					)
-
 					local distance = (
-						Vector2.new(screenPos.X, screenPos.Y)
-						- center
+						Vector2.new(
+							screenPosition.X,
+							screenPosition.Y
+						) - center
 					).Magnitude
 
 					if distance < closestDistance then
+
 						closestDistance = distance
 						closest = player
 					end
@@ -171,6 +262,281 @@ local function getClosestPlayer()
 end
 
 --==================================================
+-- GET NPC TARGET
+--==================================================
+
+local function getNPCTarget()
+
+	local closest = nil
+	local closestDistance = math.huge
+
+	local center = Vector2.new(
+		Camera.ViewportSize.X / 2,
+		Camera.ViewportSize.Y / 2
+	)
+
+	for _, object in workspace:GetDescendants() do
+
+		if object:IsA("Model") then
+
+			local humanoid =
+				object:FindFirstChildOfClass("Humanoid")
+
+			if humanoid and humanoid.Health > 0 then
+
+				-- Ignore player characters
+				if not Players:GetPlayerFromCharacter(object) then
+
+					local body = getTargetPart(object)
+
+					if body and body:IsA("BasePart") then
+
+						local screenPosition, visible =
+							Camera:WorldToViewportPoint(
+								body.Position
+							)
+
+						if visible then
+
+							local distance = (
+								Vector2.new(
+									screenPosition.X,
+									screenPosition.Y
+								) - center
+							).Magnitude
+
+							if distance < closestDistance then
+
+								closestDistance = distance
+								closest = object
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+
+	return closest
+end
+
+--==================================================
+-- TARGET VALIDATION
+--==================================================
+
+local function isValidTarget(target)
+
+	if not target then
+		return false
+	end
+
+	-- PLAYER
+	if target:IsA("Player") then
+
+		if not PlayersEnabled then
+			return false
+		end
+
+		local character = target.Character
+
+		if not character then
+			return false
+		end
+
+		local humanoid =
+			character:FindFirstChildOfClass("Humanoid")
+
+		local body =
+			getTargetPart(character)
+
+		return humanoid
+			and body
+			and humanoid.Health > 0
+	end
+
+	-- NPC
+	if target:IsA("Model") then
+
+		if not NPCsEnabled then
+			return false
+		end
+
+		local humanoid =
+			target:FindFirstChildOfClass("Humanoid")
+
+		local body =
+			getTargetPart(target)
+
+		return humanoid
+			and body
+			and humanoid.Health > 0
+	end
+
+	return false
+end
+
+--==================================================
+-- FIND TARGET
+--==================================================
+
+local function findTarget()
+
+	local playerTarget = nil
+	local npcTarget = nil
+
+	if PlayersEnabled then
+		playerTarget = getPlayerTarget()
+	end
+
+	if NPCsEnabled then
+		npcTarget = getNPCTarget()
+	end
+
+	-- Nothing enabled
+	if not PlayersEnabled and not NPCsEnabled then
+		return nil
+	end
+
+	-- Players only
+	if PlayersEnabled and not NPCsEnabled then
+		return playerTarget
+	end
+
+	-- NPCs only
+	if NPCsEnabled and not PlayersEnabled then
+		return npcTarget
+	end
+
+	-- Both enabled
+	if playerTarget and not npcTarget then
+		return playerTarget
+	end
+
+	if npcTarget and not playerTarget then
+		return npcTarget
+	end
+
+	if not playerTarget and not npcTarget then
+		return nil
+	end
+
+	-- Both exist: choose closest to screen center
+
+	local center = Vector2.new(
+		Camera.ViewportSize.X / 2,
+		Camera.ViewportSize.Y / 2
+	)
+
+	local function getDistance(target)
+
+		local character
+
+		if target:IsA("Player") then
+			character = target.Character
+		else
+			character = target
+		end
+
+		local body =
+			getTargetPart(character)
+
+		if not body then
+			return math.huge
+		end
+
+		local position =
+			Camera:WorldToViewportPoint(
+				body.Position
+			)
+
+		return (
+			Vector2.new(
+				position.X,
+				position.Y
+			) - center
+		).Magnitude
+	end
+
+	if getDistance(playerTarget)
+		<= getDistance(npcTarget) then
+
+		return playerTarget
+
+	else
+
+		return npcTarget
+	end
+end
+
+--==================================================
+-- DISABLE AIMLOCK
+--==================================================
+
+local function disableAimlock()
+
+	CurrentTarget = nil
+	AimlockEnabled = false
+
+	AimButton.Text = "AIMLOCK: OFF"
+end
+
+--==================================================
+-- BUTTONS
+--==================================================
+
+PlayersButton.Activated:Connect(function()
+
+	PlayersEnabled = not PlayersEnabled
+
+	PlayersButton.Text =
+		PlayersEnabled
+		and "PLAYERS: ON"
+		or "PLAYERS: OFF"
+
+	-- If current target is a player
+	-- and player targeting gets disabled
+	if CurrentTarget
+		and CurrentTarget:IsA("Player")
+		and not PlayersEnabled then
+
+		disableAimlock()
+	end
+end)
+
+NPCButton.Activated:Connect(function()
+
+	NPCsEnabled = not NPCsEnabled
+
+	NPCButton.Text =
+		NPCsEnabled
+		and "NPCs: ON"
+		or "NPCs: OFF"
+
+	-- If current target is an NPC
+	-- and NPC targeting gets disabled
+	if CurrentTarget
+		and CurrentTarget:IsA("Model")
+		and not NPCsEnabled then
+
+		disableAimlock()
+	end
+end)
+
+AimButton.Activated:Connect(function()
+
+	AimlockEnabled = not AimlockEnabled
+
+	AimButton.Text =
+		AimlockEnabled
+		and "AIMLOCK: ON"
+		or "AIMLOCK: OFF"
+
+	if not AimlockEnabled then
+		CurrentTarget = nil
+	end
+end)
+
+--==================================================
 -- AIMLOCK
 --==================================================
 
@@ -180,67 +546,52 @@ RunService.RenderStepped:Connect(function()
 		return
 	end
 
-	local target = getClosestPlayer()
+	-- Keep the SAME target
+	if CurrentTarget then
 
-	if target and target.Character then
-
-		local root =
-			target.Character:FindFirstChild("HumanoidRootPart")
-
-		if root then
-
-			Camera.CFrame = CFrame.lookAt(
-				Camera.CFrame.Position,
-				root.Position
-			)
-
+		-- Target died/reset
+		if not isValidTarget(CurrentTarget) then
+			disableAimlock()
+			return
 		end
 	end
-end)
 
---==================================================
--- AUTOMATIC SKY-BLUE ESP
---==================================================
+	-- Pick target only if we don't already have one
+	if not CurrentTarget then
 
-local function setupESP(player)
+		CurrentTarget = findTarget()
 
-	if player == LocalPlayer then
+		if not CurrentTarget then
+			return
+		end
+	end
+
+	local character
+
+	if CurrentTarget:IsA("Player") then
+		character = CurrentTarget.Character
+	else
+		character = CurrentTarget
+	end
+
+	local body =
+		getTargetPart(character)
+
+	if not body then
+		disableAimlock()
 		return
 	end
 
-	local function addHighlight(character)
+	-- Lock camera onto current target
+	Camera.CFrame = CFrame.lookAt(
+		Camera.CFrame.Position,
+		body.Position
+	)
+end)
 
-		local old = character:FindFirstChild("ShadeESP")
+--==================================================
+-- MADE BY SHADE
+--==================================================
 
-		if old then
-			old:Destroy()
-		end
-
-		local highlight = Instance.new("Highlight")
-
-		highlight.Name = "ShadeESP"
-		highlight.Adornee = character
-		highlight.FillColor = SKY_BLUE
-		highlight.OutlineColor = SKY_BLUE
-		highlight.FillTransparency = 0.65
-		highlight.OutlineTransparency = 0
-		highlight.DepthMode =
-			Enum.HighlightDepthMode.AlwaysOnTop
-
-		highlight.Parent = character
-	end
-
-	if player.Character then
-		addHighlight(player.Character)
-	end
-
-	player.CharacterAdded:Connect(addHighlight)
-end
-
-for _, player in Players:GetPlayers() do
-	setupESP(player)
-end
-
-Players.PlayerAdded:Connect(setupESP)
-
+print("Shade Target System loaded")
 print("Made by Shade")
